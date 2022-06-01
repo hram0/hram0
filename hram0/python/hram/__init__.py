@@ -1,4 +1,4 @@
-# Some refactoring is in order here; e.g: any classes have public attributes that should be properties instead etc.
+# Some refactoring is in order here; e.g: many classes have public attributes that should be properties instead etc.
 
 
 import json
