@@ -639,20 +639,22 @@ class Assembler(object):
 
 
 
+    
+    
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("usage: python3 %s <input-file>" % sys.argv[0])
+        exit(1)
 
-if len(sys.argv) < 2:
-    print("usage: python3 %s <input-file>" % sys.argv[0])
-    exit(1)
+    in_filename = sys.argv[1]
+    assembler = Assembler(hram.HRAM0S_PARAMS)
+    with open(in_filename) as in_f:
+        obj = assembler.assemble(in_f)
 
-in_filename = sys.argv[1]
-assembler = Assembler(hram.HRAM0S_PARAMS)
-with open(in_filename) as in_f:
-    obj = assembler.assemble(in_f)
+        in_filename_parts = in_filename.split('.')
+        out_filename = '.'.join(in_filename_parts[:-1]) + '.prg'
 
-    in_filename_parts = in_filename.split('.')
-    out_filename = '.'.join(in_filename_parts[:-1]) + '.prg'
-
-    with open(out_filename, 'w') as out_f:
-        json.dump(obj, out_f)
+        with open(out_filename, 'w') as out_f:
+            json.dump(obj, out_f)
 
 exit(0)
