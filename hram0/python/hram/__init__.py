@@ -1,3 +1,6 @@
+# Some refactoring is in order here; e.g: any classes have public attributes that should be properties instead etc.
+
+
 import json
 
 MIN_DATA_REGISTERS = 2
