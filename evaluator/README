@@ -1,0 +1,6 @@
+The evaluator program takes a program file (.prg) as a command-line argument. If the program contained therein is valid, the user is then prompted to enter an input (x), a sequence of integers (separated by commas) of the user's choosing. The length of the sequence is assigned to the program register n.  The program is then executed until it either terminates with an error, which is reported, or terminates in the HALT state. In the event of the latter, the user is repeatedly prompted to enter a memory address to print its contents or enter 'q' to quit.
+The bash script eval.sh sets the PYTHONPATH enviornment variable so that the hram module can be found, then runs python3 eval.py.
+
+So for example, to run the included selection sort program in the '../programs' directory, execute
+
+./eval.sh ../programs/selsort.prg

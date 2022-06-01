@@ -1,0 +1,68 @@
+The assembler takes an assembly file (.asm) written in HRAM0 assembly language whose syntax is demonstrated by the examples in the '../programs' directory. A brief overview of the format is as follows.
+
+A "section" is a program structure delimited with a line containing 'BEGIN <type>' where <type> is the section type, and a line containing 'END <type>'. For example:
+
+BEGIN CONSTANTS
+
+MIN_SHADE,      1,        0
+MAX_SHADE,      1,        255
+RED,            3,        255, 0, 0
+GREEN,          3,        0, 255, 0
+BLUE,           3,        0, 0, 255
+
+END CONSTANTS
+
+The above is a constants section. It defines five constants. The first is named 'MIN_SHADE' and occupies 1 integer and whose value is 0. The third is named 'RED' and is an array of 3 integers containing the the values 255, 0, 0.
+
+Below is a data section which defines two variables, a single integer and an array. It has identical syntax to a constants section.
+
+BEGIN DATA
+
+speed, 1,       0
+color, 3,       255, 255, 255
+
+END DATA
+
+In the assembly specification, the /value/ of say the second element of the array 'color' (i.e. with index 1) as it is defined in the data section is specified by writing 'color[1]'. If one needs to specify the address in the data segment of where color[1] resides, one writes '&color[1]'.
+
+A macro section has a name and an arity (number of arguments). When a macro appears in the main code block, the arguments it takes are supplied with the intention that the assembler expands the occurence of the macro to its associated block of code. Argument number 2 (say) where indexing starts at 0 is referenced with 'args[2]'. Furthermore, comments involve adding '#' and the rest of the line following the '#' character is taken as a comment, and ignored by the assembler. Here is an example of a macro that takes a register and three constant values as arguments.
+
+# This macro takes a register and three constant values, stores each of them at
+# the address given by the supplied register (the first argument) and its
+# adjacent locations (the register in args[0] along with r3 are modified)
+# r2 is assumed to be -1 (this is a convention I unvaryingly follow)
+BEGIN MACRO set_color 4
+
+      put args[1], r3
+      sto r3, args[0]
+      sub r2, args[0], args[0]
+      sto args[2], args[0]
+      sub r2, args[0], args[0]
+      sto args[3], args[0]
+
+END MACRO
+
+All assembly files are required to have a main code block. This is defined in a code section, like the one that follows:
+
+BEGIN CODE
+
+start:
+        put -1, r2
+        put &color, r4
+        set_color r4, RED[0], RED[1], RED[2]
+        hlt
+
+END CODE
+
+
+The above code puts the value -1 in r2 and puts the address of the variable 'color' (that we defined earlier in the data section) in r4. Next it uses the set_color macro with the arguments r4 and the three components of the 3-element constant array 'RED' (that we defined in the constants section). The occurence above of 'start:' is an example of a label which maps to an address in the code segment. The label 'start' above maps to 0 for example.
+
+-------------------------------------------------------------------------------
+
+RUNNING THE ASSEMBLER
+#####################
+The bash script assemble.sh sets the PYTHONPATH enviornment variable so that the hram module can be found, then runs python3 assemble.py. To run the assembler on the ../programs/selsort.asm file, execute the following:
+
+./assemble.sh ../programs/selsort.asm
+
+The file ../programs/selsort.prg should be generated. You can execute this program with the evaluator. See the ../evaluator directory.
