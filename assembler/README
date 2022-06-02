@@ -36,9 +36,11 @@ BEGIN MACRO set_color 4
       put args[1], r3
       sto r3, args[0]
       sub r2, args[0], args[0]
-      sto args[2], args[0]
+      put args[2], r3
+      sto r3, args[0]
       sub r2, args[0], args[0]
-      sto args[3], args[0]
+      put args[3], r3
+      sto r3, args[0]
 
 END MACRO
 
