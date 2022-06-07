@@ -18,7 +18,6 @@ The 'programs' directory contains the example selsort.asm, which is an implement
 2. Implementation in Coq modelled on the above.
 3. Proofs in Coq of some important properties (ongoing research).
 4. Write a guide on the assembler's syntax.
-5. Add "imports" (i.e. inclusion of other .asm files) to the assembler.
 
 
 ## Usage and License
