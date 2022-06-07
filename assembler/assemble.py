@@ -13,6 +13,7 @@ TOKEN_SPECIAL_REGISTER = 2
 TOKEN_IDENT = 3
 TOKEN_MNEMONIC = 4
 TOKEN_KEYWORD = 5
+TOKEN_STRING = 6
 
 
 OPERAND_CONSTANT = 0
@@ -37,6 +38,7 @@ class DataVar(object):
         self.size = size
         self.data = data
         self.index = index
+        self.data_offset = 0
 
 class Operand(object):
 
@@ -174,6 +176,10 @@ def is_ident(token, ident=None):
     return token.token_type is TOKEN_IDENT \
         and (ident is None or token.value == ident)
 
+def is_string(token, s=None):
+    return token.token_type is TOKEN_STRING \
+        and (s is None or token.value == s)
+
 def is_operand(token):
     return is_constant(token) or is_ident(token) or is_register(token)
 
@@ -271,6 +277,7 @@ class Assembler(object):
         num_data_registers = params['rho']
         assert num_data_registers >= hram.MIN_DATA_REGISTERS
 
+        self.params = params
         self.num_data_registers = num_data_registers
         self.num_registers = num_data_registers + hram.NUM_SPECIAL_REGISTERS
         self._pc_index = num_data_registers
@@ -280,7 +287,7 @@ class Assembler(object):
         self._ident_regex = re.compile('^&?([a-zA-Z0-9_]+)(\[(\d+)\])?$')
         
         self.instructions = dict()
-        self.keywords = ['begin', 'end', 'code', 'macro', 'data', 'constants']
+        self.keywords = ['begin', 'end', 'code', 'macro', 'data', 'constants', 'includes', 'include']
         self._global_labels = dict()
         
         opcode = 0
@@ -300,7 +307,7 @@ class Assembler(object):
 
 
     
-    def assemble(self, f):
+    def process(self, f):
         tokens_list = []
         line_no = 0
         for line in f:
@@ -311,12 +318,17 @@ class Assembler(object):
                 tokens_list.append(tokens)
             line_no += 1
 
+        self._data_offset = 0
+            
         self._macros = dict()
-        self._data = []
         self._global_vars = dict()
         self._constants = dict()
+        self._data = []
+
+        self._includes = []
 
         begin_index = 0
+        section_count = 0
 
         section, sec_attrs, end_index = self._extract_section(tokens_list,
                                                               begin_index)
@@ -334,7 +346,11 @@ class Assembler(object):
                 
                 array, self._constants = self._parse_data(c_tokens_list)
                     
-            
+            elif section == 'includes':
+                if section_count > 0:
+                    raise AssemblerException("Includes section must be first section")
+                i_tokens_list = tokens_list[begin_index + 1:end_index]
+                self._includes = self._parse_includes(i_tokens_list)
             elif section == 'macro':
                 m_tokens_list = tokens_list[begin_index + 1:end_index]
                 macro = self._parse_macro(m_tokens_list, sec_attrs)
@@ -342,17 +358,117 @@ class Assembler(object):
             else:
                 raise AssemblerException("Unknown section type")
 
+            section_count += 1
             begin_index = end_index + 1
             section, sec_attrs, end_index = self._extract_section(tokens_list,
                                                                   begin_index)
         if section != 'code':
             raise AssemblerException("Coud not find code section")
 
+        self._asms = []
+        for included_filename in self._includes:
+            with open(included_filename) as inc_f:
+                asm = Assembler(self.params)
+                asm.process(inc_f)
+                self._macros.update(asm.macros)
+                self._asms.append(asm)
+                
+                
+
         c_tokens_list = tokens_list[begin_index + 1:end_index]
         self._main_block = self._parse_block(c_tokens_list)
         self._global_labels = self._main_block.labels
-        self._main_block = self._reduce_block(self._main_block)
-        return {'code':self._main_block.encode(), 'data':self._data}
+
+
+    def render(self, base_address=0):
+        self._code = []
+        
+        code_addr = 0
+        data_addr = 0
+
+        main_data = self._data
+        self._data = []
+        self._included_vars = dict()
+        self._included_labels = dict()
+
+        # One assembler (asm) for each included file
+        for asm in self._asms:
+            asm.rebase_data(self._data_offset + data_addr)
+
+            self._constants.update(asm.constants)
+                
+            encoding = asm.render(base_address + code_addr)
+            self._code.extend(encoding['code'])
+            incl_data = encoding['data']
+            self._data.extend(incl_data)                    
+            self._included_vars.update(asm.global_vars)
+            self._included_vars.update(asm.included_vars)
+            self._included_labels.update(asm.global_labels)
+            self._included_labels.update(asm.included_labels)
+            
+            data_addr += len(incl_data)
+            code_addr += len(encoding['code'])
+
+        for var_name in self._global_vars:
+            var = self._global_vars[var_name]
+            var.data_offset += data_addr
+
+        print(code_addr)
+
+        self._data.extend(main_data)
+        self._main_block = self._reduce_block(self._main_block,
+                                              base_address + code_addr)        
+        self._code.extend(self._main_block.encode())
+        return {'code':self._code, 'data':self._data}
+
+
+    def assemble(self, f, path='.'):
+        self._path = path
+        self.process(f)
+        return self.render()
+
+    def rebase_data(self, base_addr):
+        for var_name in self._global_vars:
+            var = self._global_vars[var_name]
+            var.data_offset = base_addr
+        self._data_offset = base_addr            
+
+    @property
+    def main_block(self):
+        return self._main_block
+
+    @property
+    def global_labels(self):
+        return self._global_labels
+
+    @property
+    def included_labels(self):
+        return self._included_labels
+
+    @property
+    def code(self):
+        return self._code
+
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def global_vars(self):
+        return self._global_vars
+
+    @property
+    def included_vars(self):
+        return self._included_vars
+    
+
+    @property
+    def macros(self):
+        return self._macros
+
+    @property
+    def constants(self):
+        return self._constants
         
 
     ###########################################################################
@@ -384,6 +500,8 @@ class Assembler(object):
                                             mapping[t]))
                     elif t in self.keywords:
                         tokens.append(Token(TOKEN_KEYWORD, t))
+                    elif t.startswith('"') and t.endswith('"'):
+                        tokens.append(Token(TOKEN_STRING, t[1:-1]))
                     elif self._ident_regex.match(t):
                         tokens.append(Token(TOKEN_IDENT, t))
                     else:
@@ -404,6 +522,19 @@ class Assembler(object):
         block = self._parse_block(tokens_list)
         
         return Assembler.AMacro(name, arity, block)
+
+    def _parse_includes(self, tokens_list):
+        includes = []
+
+        for tokens in tokens_list:
+            if not len(tokens) == 2 or not is_keyword(tokens[0], 'include') or\
+               not is_string(tokens[1]):
+                raise AssemblerException("Invalid include statement")
+
+            includes.append('%s/%s' % (self._path, tokens[1].value))
+
+        return includes
+
 
     def _parse_data(self, tokens_list):
         data = []
@@ -514,6 +645,9 @@ class Assembler(object):
         if symbol_str in self._global_labels:
             return (TYPE_LABEL, self._global_labels[symbol_str])
 
+        if symbol_str in self._included_labels:
+            return (TYPE_LABEL, self._included_labels[symbol_str])
+
         is_address = len(symbol_str) >= 2 and symbol_str[0] == '&'
         if is_address:
             symbol_str = symbol_str[1:]
@@ -532,7 +666,18 @@ class Assembler(object):
             if index >= var.size:
                 raise ResolverException('Array access to %s out of bounds' % ident)
             if is_address:
-                return (TYPE_CONSTANT, var.index + index)
+                return (TYPE_CONSTANT, var.data_offset + var.index + index)
+            else:
+                return (TYPE_CONSTANT, var.data[var.index + index])
+
+
+        if ident in self._included_vars:
+            var = self._included_vars[ident]
+            
+            if index >= var.size:
+                raise ResolverException('Array access to %s out of bounds' % ident)
+            if is_address:
+                return (TYPE_CONSTANT, var.data_offset + var.index + index)
             else:
                 return (TYPE_CONSTANT, var.data[var.index + index])
 
@@ -612,7 +757,9 @@ class Assembler(object):
                     address += 1 + len(red_op.operands)
                 macro_end_addr = address
 
-                macro_addr_delta = macro_end_addr - macro_start_addr
+                macro_addr_delta = (macro_end_addr - macro_start_addr) - \
+                    (1 + macro.arity)
+                print('%s:delta %d' % (macro.name, macro_addr_delta))
 
                 red_label_strs = list(red_labels.keys())
                 for label in red_label_strs:
@@ -638,10 +785,8 @@ class Assembler(object):
         return is_target(tokens[1])
 
 
-
-    
-    
 if __name__ == "__main__":
+
     if len(sys.argv) < 2:
         print("usage: python3 %s <input-file>" % sys.argv[0])
         exit(1)
@@ -649,12 +794,15 @@ if __name__ == "__main__":
     in_filename = sys.argv[1]
     assembler = Assembler(hram.HRAM0S_PARAMS)
     with open(in_filename) as in_f:
-        obj = assembler.assemble(in_f)
-
         in_filename_parts = in_filename.split('.')
+        dir_parts = in_filename.split('/')
+        path = '/'.join(dir_parts[:-1])
+        obj = assembler.assemble(in_f, path)
+            
+
         out_filename = '.'.join(in_filename_parts[:-1]) + '.prg'
 
         with open(out_filename, 'w') as out_f:
             json.dump(obj, out_f)
 
-exit(0)
+    exit(0)
