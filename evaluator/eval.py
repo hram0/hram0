@@ -7,7 +7,7 @@ from hram import HRAM0
 if __name__ == "__main__":
     mach = HRAM0(hram.HRAM0S_PARAMS)
 
-    encode = lambda x: [int(s) for s in x.split(',')]
+    encode = lambda x: [int(s) for s in x.split(',') if len(s) > 0]
     decode = lambda M, n: M
 
 
