@@ -1,6 +1,24 @@
-The evaluator program takes a program file (.prg) as a command-line argument. If the program contained therein is valid, the user is then prompted to enter an input (x), a sequence of integers (separated by commas) of the user's choosing. The length of the sequence is assigned to the program register n.  The program is then executed until it either terminates with an error, which is reported, or terminates in the HALT state. In the event of the latter, the user is repeatedly prompted to enter a memory address to print its contents or enter 'q' to quit.
+The evaluator program takes a command and a program file (.prg) as command-line arguments. If the program contained in the program file is valid, the user is then prompted to enter an input (x), a sequence of integers (separated by commas) of the user's choosing. The length of the sequence is assigned to the program register n.
+
+There are three valid commands: run, step and disasm. All three are followed by the program file.
+
+Run Command
+-----------
+The program is executed until it either terminates with an error, which is reported, or terminates in the HALT state. In the event of the latter, the user is repeatedly prompted to enter a memory address or a register to print its contents or enter 'q' to quit.
+
+Step Command
+------------
+The program is executed step by step. The menu of options to enter at the prompt is displayed by entering 'm'. One can print the contents of a memory address or a register. The option 's' executes the next step. Breakpoints can also be set and unset. The option 'c' continues execution until the program terminates or a breakpoint is encountered.
+
+Disasm
+------
+This option disassembles the program file and prints the assembly (in HRAM0 assembler format) to stdout.
+
+
+Bash Script
+-----------
 The bash script eval.sh sets the PYTHONPATH enviornment variable so that the hram module can be found, then runs python3 eval.py.
 
 So for example, to run the included selection sort program in the '../programs' directory, execute
 
-./eval.sh ../programs/selsort.prg
+./eval.sh run ../programs/selsort.prg
