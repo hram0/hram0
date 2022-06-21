@@ -1,6 +1,3 @@
-# Some refactoring is in order here; e.g: many classes have public attributes that should be properties instead etc.
-
-
 import json
 
 MIN_DATA_REGISTERS = 2
@@ -48,6 +45,14 @@ def print_registers(r):
     print(', '.join(['r%d: %d' % (i, r[i]) for i in range(len(r))]))
 
 
+class ExecutionException(Exception):
+    def __init__(self, error_str):
+        self.error_str = error_str
+
+    def __str__(self):
+        return self.error_str
+
+
 class ProgramState(object):
 
     def __init__(self, r, mem, blks, e, stack, copy=True):
@@ -68,7 +73,6 @@ class ProgramState(object):
     def copy(self):
         return ProgramState(self.registers, self.memory, self.blocks,
                             self.heap_start, self.call_stack)
-
     
 class MachineState(object):
     code = []
@@ -114,7 +118,7 @@ class HRAM0(object):
         def __init__(self, opcode, mnemonic, signature, sigma, machine, func,
                      vpred=None):
             super(HRAM0.MInstruction, self).__init__(opcode, mnemonic,
-                                                       signature)
+                                                     signature)
             self._machine = machine
             self._func = func
             self._vpred = vpred
@@ -203,6 +207,28 @@ class HRAM0(object):
             self.state = instr.execute(self.state)
         return True
 
+    def step_cycle(self):
+        if self.state.sigma is STATE_FETCH:
+            self.advance()
+
+        while not self.state.sigma is STATE_FETCH:
+            if not self.advance():
+                return False
+
+        return True
+
+    def code_offsets(self, code):
+        if not self.validate_code(code):
+            return
+
+        len_code = len(code)
+        address = 0
+        while address < len_code:
+            yield address
+            opcode = code[address]
+            address += 1 + self.instructions[opcode].num_operands
+            
+
     def validate_code(self, code):
         # valid_targets is the set of addresses that are instruction boundaries
         # and therefore valid branch/call targets
@@ -231,6 +257,31 @@ class HRAM0(object):
             address += 1 + instr.num_operands
         return True
 
+    def disassemble_instruction(self, code, offset):
+        instr = self.instructions[code[offset]]
+        if offset + 1 + instr.num_operands > len(code):
+            return None
+
+        asm = "%s" % instr.mnemonic
+        reg_names = ['r%d' % i for i in range(self.num_data_registers)] + ['pc', 'n']
+        index = 0
+        for operand in instr.signature:
+            asm += " "
+            if operand in [TYPE_CONSTANT, TYPE_LABEL]:
+                asm += str(code[offset + 1 + index])
+            else:
+                asm += reg_names[code[offset + 1 + index]]
+            asm += ","
+            index += 1
+        if asm.endswith(','):
+            asm = asm.removesuffix(',')
+        return asm        
+    
+    def disassemble_next_instruction(self):
+        ps = self.state.program_state
+        pc = ps.registers[self._pc_index]
+        return disassemble_instruction(self.state.code, pc)
+
     def load(self, code, data):
         if not self.validate_code(code):
             raise 'Invalid program'
@@ -243,8 +294,8 @@ class HRAM0(object):
     def run(self, inp):
         n = len(inp)
         init_mem_contents = self.state.data + inp
-        e = len(init_mem_contents)        
-        M = {i:init_mem_contents[i] for i in range(e)}        
+        e = len(init_mem_contents) + self.zeta        
+        M = {i:init_mem_contents[i] for i in range(len(init_mem_contents))}
         B = dict()
         r = [0] * self.num_registers
         r[self._n_index] = n
@@ -568,10 +619,9 @@ class DynamicMemory(object):
         self.blocks = list(blocks.items())
         self.blocks.sort(key=lambda b: b[0])
 
-        size = 0
-        for (start, end) in blocks.items():
-            if end > size:
-                size = end
+        size = static_data_size
+        if len(self.blocks) > 0:
+            size = self.blocks[-1][1]
 
         self.size = size
         
@@ -637,4 +687,3 @@ class Executor(object):
 HRAM0S_RHO = 14
 HRAM0S_ZETA = 10
 HRAM0S_PARAMS = {'rho':HRAM0S_RHO, 'zeta':HRAM0S_ZETA}
-
