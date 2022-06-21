@@ -65,6 +65,11 @@ RUNNING THE ASSEMBLER
 #####################
 The bash script assemble.sh sets the PYTHONPATH enviornment variable so that the hram module can be found, then runs python3 assemble.py. To run the assembler on the ../programs/selsort.asm file, execute the following:
 
-./assemble.sh ../programs/selsort.asm
+./assemble.sh ../programs/src/selsort.asm
 
-The file ../programs/selsort.prg should be generated. The '-o' option can be used to select the output directory or output file. If the supplied argument ends with '/' then it is interepreted as a directory and a .prg file is stored in that directory; otherwise the supplied argument is the path of the output file. You can execute this program with the evaluator. See the ../evaluator directory.
+The file ../programs/selsort.prg should be generated. You can execute this program with the evaluator. See the ../evaluator directory.
+
+Note the '-o' option can be used to select the output directory or output file. If the supplied argument ends with '/' then it is interepreted as a directory and a .prg file is stored in that directory; otherwise the supplied argument is the path of the output file.
+For example:
+
+./assemble.sh -o ../programs/bin/ ../programs/src/selsort.asm
