@@ -814,7 +814,7 @@ if __name__ == "__main__":
     for opt, arg in opts:
         if opt in ['-o']:
             out_filename = arg
-            if not out_filename.endswith('/'):
+            if out_filename.endswith('/'):
                 root_name = '.'.join(in_filename.split('/')[-1].split('.')[:-1])
                 out_filename += "%s.prg" % root_name
 
