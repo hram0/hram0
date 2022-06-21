@@ -5,6 +5,7 @@ import hram
 from hram import TYPE_CONSTANT, TYPE_REGISTER, TYPE_LABEL
 import re
 import json
+import getopt
 
 
 TOKEN_CONSTANT = 0
@@ -27,9 +28,16 @@ class AssemblerException(Exception):
     def __init__(self, error_str):
         self.error_str = error_str
 
+    def __str__(self):
+        return self.error_str    
+        
+        
 class ResolverException(Exception):
     def __init__(self, error_str):
         self.error_str = error_str
+
+    def __str__(self):
+        return self.error_str        
 
 class DataVar(object):
 
@@ -413,8 +421,6 @@ class Assembler(object):
             var = self._global_vars[var_name]
             var.data_offset += data_addr
 
-        print(code_addr)
-
         self._data.extend(main_data)
         self._main_block = self._reduce_block(self._main_block,
                                               base_address + code_addr)        
@@ -759,7 +765,6 @@ class Assembler(object):
 
                 macro_addr_delta = (macro_end_addr - macro_start_addr) - \
                     (1 + macro.arity)
-                print('%s:delta %d' % (macro.name, macro_addr_delta))
 
                 red_label_strs = list(red_labels.keys())
                 for label in red_label_strs:
@@ -786,21 +791,38 @@ class Assembler(object):
 
 
 if __name__ == "__main__":
+    opts = []
+    args = []
 
-    if len(sys.argv) < 2:
+    argv = sys.argv[1:]    
+    
+    try:
+        opts, args = getopt.getopt(argv, "o:")
+    except:
+        print("Error parsing args")
+    
+    if len(args) < 1:
         print("usage: python3 %s <input-file>" % sys.argv[0])
         exit(1)
 
-    in_filename = sys.argv[1]
+    in_filename = args[0]
+    in_filename_parts = in_filename.split('.')
+    dir_parts = in_filename.split('/')
+    path = '/'.join(dir_parts[:-1])
+    out_filename = '.'.join(in_filename_parts[:-1]) + '.prg'    
+
+    for opt, arg in opts:
+        if opt in ['-o']:
+            out_filename = arg
+            if not out_filename.endswith('/'):
+                root_name = '.'.join(in_filename.split('/')[-1].split('.')[:-1])
+                out_filename += "%s.prg" % root_name
+
+    
     assembler = Assembler(hram.HRAM0S_PARAMS)
     with open(in_filename) as in_f:
-        in_filename_parts = in_filename.split('.')
-        dir_parts = in_filename.split('/')
-        path = '/'.join(dir_parts[:-1])
         obj = assembler.assemble(in_f, path)
             
-
-        out_filename = '.'.join(in_filename_parts[:-1]) + '.prg'
 
         with open(out_filename, 'w') as out_f:
             json.dump(obj, out_f)
