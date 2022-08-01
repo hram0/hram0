@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 export PYTHONPATH=../hram0/python
-python3 assemble.py $1
+python3 assemble.py $@
